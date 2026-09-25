@@ -1,4 +1,4 @@
-# Belhekar ERP — React + Vite
+# Belhekar-ERP
 
 A React/Vite institutional ERP portal with role-based access, student and faculty
 records, fee transactions, attendance, documents, academics, and placements.
