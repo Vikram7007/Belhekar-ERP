@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 
+const API_BASE_URL = (
+  import.meta.env.VITE_API_URL ??
+  (import.meta.env.DEV ? '' : 'https://belhekar-erp.onrender.com')
+).replace(/\/$/, '');
+
 const DEFAULT_STATE = {
   students: [],
   faculty: [],
@@ -13,19 +18,21 @@ const DEFAULT_STATE = {
 export function useERPDatabase() {
   const [db, setDb] = useState(DEFAULT_STATE);
   const [loading, setLoading] = useState(true);
+  const [hasLoadedRemote, setHasLoadedRemote] = useState(false);
   const remoteUpdateRef = useRef(false);
 
   useEffect(() => {
     let active = true;
 
-    async function loadData(isPolling = false) {
+    async function loadData() {
       try {
-        const res = await fetch('/api/db');
+        const res = await fetch(`${API_BASE_URL}/api/db`);
         if (res.ok) {
           const data = await res.json();
           if (active) {
-            remoteUpdateRef.current = isPolling;
+            remoteUpdateRef.current = true;
             setDb({ ...DEFAULT_STATE, ...data });
+            setHasLoadedRemote(true);
           }
         } else {
           console.error('Failed to load database from backend');
@@ -38,7 +45,7 @@ export function useERPDatabase() {
     }
     loadData();
 
-    const refreshId = setInterval(() => loadData(true), 10000);
+    const refreshId = setInterval(loadData, 10000);
     return () => {
       active = false;
       clearInterval(refreshId);
@@ -48,7 +55,7 @@ export function useERPDatabase() {
   // Sync state changes to MongoDB
   useEffect(() => {
     // Skip syncing if we are still loading the initial database state
-    if (loading) return;
+    if (loading || !hasLoadedRemote) return;
     if (remoteUpdateRef.current) {
       remoteUpdateRef.current = false;
       return;
@@ -57,7 +64,7 @@ export function useERPDatabase() {
     const controller = new AbortController();
     async function syncData() {
       try {
-        await fetch('/api/db/sync', {
+        await fetch(`${API_BASE_URL}/api/db/sync`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(db),
@@ -77,7 +84,7 @@ export function useERPDatabase() {
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [db, loading]);
+  }, [db, hasLoadedRemote, loading]);
 
   return [db, setDb];
 }
